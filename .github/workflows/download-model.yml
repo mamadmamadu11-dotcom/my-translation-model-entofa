@@ -1,7 +1,7 @@
-name: Download Model and Split into 10MB Chunks
+name: Download and Create Separate 10MB Chunk ZIPs
 on: workflow_dispatch
 jobs:
-  download-and-split:
+  split-and-zip:
     runs-on: ubuntu-latest
     steps:
       - name: Install Git LFS
@@ -16,69 +16,35 @@ jobs:
           cd ./model
           git lfs pull
       
-      - name: Find and split main model file into 10MB chunks
+      - name: Split model into 10MB chunks and create individual ZIPs
         run: |
           cd ./model
           
-          # پیدا کردن فایل بزرگ (وزن‌های مدل)
+          # پیدا کردن فایل اصلی مدل
           MAIN_FILE=$(find . -type f -size +50M | head -1)
-          if [ -z "$MAIN_FILE" ]; then
-            echo "ERROR: No large model file found!"
-            exit 1
-          fi
-          
-          echo "Splitting file: $MAIN_FILE"
-          ORIGINAL_SIZE=$(ls -lh "$MAIN_FILE" | awk '{print $5}')
-          echo "Original size: $ORIGINAL_SIZE"
-          
-          # ایجاد پوشه برای تکه‌ها
-          mkdir -p ./chunks
-          
-          # نام فایل اصلی
           BASENAME=$(basename "$MAIN_FILE")
           
-          # تقسیم به تکه‌های 10 مگابایتی (10 * 1024 * 1024 = 10485760 bytes)
-          split -b 10485760 "$MAIN_FILE" ./chunks/"${BASENAME}.part."
+          echo "Splitting: $MAIN_FILE"
           
-          # شمارش تعداد تکه‌ها
-          CHUNK_COUNT=$(ls -1 ./chunks/ | wc -l)
-          echo "Created $CHUNK_COUNT chunks of 10MB each"
+          # تقسیم به تکه‌های 10 مگابایتی
+          mkdir -p ./chunks
+          split -b 10485760 "$MAIN_FILE" ./chunks/chunk_
           
-          # ذخیره اطلاعات برای بازسازی
-          echo "$MAIN_FILE" > ./chunks/original_filename.txt
-          echo "$CHUNK_COUNT" > ./chunks/total_chunks.txt
-          
-          # نمایش لیست تکه‌ها
-          ls -lh ./chunks/
-      
-      - name: Upload each chunk as separate artifact
-        run: |
-          cd ./model/chunks
-          
-          # آپلود هر تکه به صورت جداگانه
-          for CHUNK in *.part.*; do
-            # استخراج شماره تکه
-            CHUNK_NUMBER=$(echo "$CHUNK" | grep -oP 'part.\d+' | sed 's/part.//')
-            
-            # آپلود با استفاده از GitHub CLI
-            echo "Uploading chunk $CHUNK_NUMBER: $CHUNK"
-            
-            # استفاده از curl برای آپلود (زیرا gh ممکن است نصب نباشد)
-            curl -L \
-              -X POST \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Content-Type: application/zip" \
-              --data-binary @"$CHUNK" \
-              "https://uploads.github.com/repos/${{ github.repository }}/actions/artifacts/${CHUNK_NUMBER}/zip?name=chunk-${CHUNK_NUMBER}"
+          # برای هر تکه، یک فایل zip جداگانه بساز
+          cd ./chunks
+          for CHUNK in chunk_*; do
+            CHUNK_NUM=$(echo "$CHUNK" | sed 's/chunk_//')
+            zip "${CHUNK_NUM}.zip" "$CHUNK"
+            echo "Created: ${CHUNK_NUM}.zip"
           done
+          
+          # ذخیره اطلاعات بازسازی
+          echo "$BASENAME" > original_name.txt
+          ls -1 *.zip > zip_files_list.txt
       
-      - name: Upload non-split files (config, tokenizer, etc.)
+      - name: Upload all chunk ZIPs as a single artifact
         uses: actions/upload-artifact@v4
         with:
-          name: model-config-files
-          path: |
-            ./model/*.json
-            ./model/*.model
-            ./model/*.txt
-            !./model/chunks/
+          name: model-10mb-chunks
+          path: ./model/chunks/*.zip
           retention-days: 7
