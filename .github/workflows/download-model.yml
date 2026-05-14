@@ -1,4 +1,4 @@
-name: Split and Create Release (Stable)
+name: Split and Create Release
 on: workflow_dispatch
 jobs:
   split-and-release:
@@ -13,40 +13,67 @@ jobs:
           git lfs install
       
       - name: Clone and split model into 10MB chunks
+        id: split
         run: |
           git clone https://huggingface.co/persiannlp/mt5-small-parsinlu-translation_en_fa ./model
           cd ./model
           git lfs pull
           
+          # پیدا کردن فایل اصلی مدل
           MAIN_FILE=$(find . -type f -size +10M | head -1)
+          echo "Main file: $MAIN_FILE"
+          
+          # ایجاد پوشه برای تکه‌ها
           mkdir -p chunks
+          
+          # تقسیم به تکه‌های 10MB
           split -b 10485760 "$MAIN_FILE" chunks/chunk_
           
+          # تغییر نام تکه‌ها و ساخت فایل zip برای هر کدام
           cd chunks
           COUNTER=1
           for FILE in chunk_*; do
             mv "$FILE" "part_${COUNTER}.bin"
+            zip "part_${COUNTER}.zip" "part_${COUNTER}.bin"
+            rm "part_${COUNTER}.bin"
             COUNTER=$((COUNTER+1))
           done
           
-          # ساخت فایل zip برای هر تکه (10 مگابایتی)
-          for i in $(seq 1 $((COUNTER-1))); do
-            zip "part_${i}.zip" "part_${i}.bin"
-            rm "part_${i}.bin"
-          done
+          TOTAL=$((COUNTER-1))
+          echo "TOTAL_CHUNKS=$TOTAL" >> $GITHUB_ENV
+          echo "total_chunks=$TOTAL" >> $GITHUB_OUTPUT
           
-          echo "TOTAL=$((COUNTER-1))" >> $GITHUB_ENV
-          echo "TOTAL_CHUNKS=$((COUNTER-1))" >> $GITHUB_ENV
+          # ذخیره اطلاعات بازسازی
+          echo "$TOTAL" > total_chunks.txt
+          echo "pytorch_model.bin" > original_name.txt
+          zip "merge_info.zip" total_chunks.txt original_name.txt
+          
+          echo "Created $TOTAL chunks of 10MB each"
+          ls -lh *.zip
       
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2  # استفاده از نسخه جدیدتر
+        uses: softprops/action-gh-release@v1
         with:
-          name: "Model Chunks (10MB each)"
-          tag_name: "model_chunks_${{ github.run_number }}"
+          name: "Model 10MB Chunks (${{ steps.split.outputs.total_chunks }} parts)"
+          tag_name: "v1.0.${{ github.run_number }}"
+          files: |
+            ./model/chunks/*.zip
           draft: false
           prerelease: false
-          files: ./model/chunks/*.zip  # آپلود همه فایل‌های zip به صورت یکجا
-          fail_on_unmatched_files: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload config files to release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Model 10MB Chunks (${{ steps.split.outputs.total_chunks }} parts)"
+          tag_name: "v1.0.${{ github.run_number }}"
+          files: |
+            ./model/*.json
+            ./model/*.model
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
