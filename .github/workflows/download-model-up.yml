@@ -1,0 +1,48 @@
+name: Download Whisper Base Persian and Upload to FTP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install git-lfs
+          git lfs install
+
+      - name: Clone model repository from Hugging Face
+        run: |
+          git clone https://huggingface.co/arun100/whisper-base-fa-2 ./model
+          cd ./model
+          git lfs pull
+
+      - name: Compress model folder (split into 10MB chunks)
+        run: |
+          # فشرده‌سازی کل پوشه مدل
+          zip -r -s 10m whisper-model.zip ./model/
+          echo "✅ Compression done. Files created:"
+          ls -lh whisper-model.z*
+
+      - name: Upload to FTP server
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: /whisper-model/
+          dangerous-clean-slate: true
+          exclude: |
+            ./model/
+            .git/
+            .gitattributes
+
+      - name: Also upload as GitHub Artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-base-fa-model-chunks
+          path: whisper-model.z*
+          retention-days: 7
