@@ -1,44 +1,12 @@
-name: Download Model from Hugging Face
+name: Download Model
 on: workflow_dispatch
 jobs:
-  download-model:
+  download:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - run: pip install huggingface-hub
+      - run: huggingface-cli download persiannlp/mt5-small-parsinlu-translation_en_fa --local-dir ./model
+      - uses: actions/upload-artifact@v4
         with:
-          python-version: '3.10'
-      - name: Install huggingface-hub with hf-transfer
-        run: |
-          pip install huggingface-hub hf-transfer
-      - name: Download the model with retry
-        run: |
-          export HF_HUB_ENABLE_HF_TRANSFER=1
-          for i in {1..3}; do
-            echo "Download attempt $i..."
-            if huggingface-cli download persiannlp/mt5-small-parsinlu-translation_en_fa \
-              --local-dir ./translation_model \
-              --local-dir-use-symlinks False \
-              --resume-download; then
-              echo "Download succeeded!"
-              exit 0
-            fi
-            echo "Download failed, retrying in 10 seconds..."
-            sleep 10
-          done
-          echo "Download failed after 3 attempts"
-          exit 1
-      - name: List downloaded files
-        run: |
-          echo "Files in model directory:"
-          ls -la ./translation_model/
-          echo "Total size:"
-          du -sh ./translation_model/
-      - name: Upload model as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: translation-model
-          path: ./translation_model
-          retention-days: 7
+          name: model
+          path: ./model
