@@ -1,0 +1,25 @@
+name: Download Model from Hugging Face
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install huggingface-hub
+        run: pip install huggingface-hub
+
+      - name: Download the model
+        run: |
+          huggingface-cli download persiannlp/mt5-small-parsinlu-translation_en_fa \
+            --local-dir ./translation_model \
+            --local-dir-use-symlinks False
