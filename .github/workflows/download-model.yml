@@ -1,7 +1,7 @@
-name: Download and Create Separate 10MB Chunk ZIPs
+name: Auto Split Model into 10MB Chunks
 on: workflow_dispatch
 jobs:
-  split-and-zip:
+  split-and-upload:
     runs-on: ubuntu-latest
     steps:
       - name: Install Git LFS
@@ -16,35 +16,120 @@ jobs:
           cd ./model
           git lfs pull
       
-      - name: Split model into 10MB chunks and create individual ZIPs
+      - name: Find main model file and calculate chunks
+        id: calc
         run: |
           cd ./model
           
-          # پیدا کردن فایل اصلی مدل
-          MAIN_FILE=$(find . -type f -size +50M | head -1)
-          BASENAME=$(basename "$MAIN_FILE")
+          # پیدا کردن فایل بزرگ (فایل وزن مدل)
+          MAIN_FILE=$(find . -type f -size +10M | head -1)
+          echo "Main file: $MAIN_FILE"
           
-          echo "Splitting: $MAIN_FILE"
+          # گرفتن حجم فایل به بایت
+          FILE_SIZE=$(stat -c%s "$MAIN_FILE")
+          echo "File size: $FILE_SIZE bytes"
           
-          # تقسیم به تکه‌های 10 مگابایتی
+          # حجم هر تکه: 10 مگابایت = 10485760 بایت
+          CHUNK_SIZE=10485760
+          
+          # محاسبه تعداد تکه‌ها (round up)
+          TOTAL_CHUNKS=$(( (FILE_SIZE + CHUNK_SIZE - 1) / CHUNK_SIZE ))
+          echo "Total chunks needed: $TOTAL_CHUNKS"
+          
+          # ذخیره در محیط GitHub Actions
+          echo "TOTAL_CHUNKS=$TOTAL_CHUNKS" >> $GITHUB_ENV
+          echo "MAIN_FILE=$MAIN_FILE" >> $GITHUB_ENV
+          
+          # نمایش حجم هر تکه به مگابایت
+          echo "Each chunk: 10 MB"
+      
+      - name: Split file into 10MB chunks
+        run: |
+          cd ./model
+          
+          # پاک کردن پوشه قبلی
+          rm -rf ./chunks
           mkdir -p ./chunks
+          
+          # تقسیم فایل به تکه‌های 10MB
           split -b 10485760 "$MAIN_FILE" ./chunks/chunk_
           
-          # برای هر تکه، یک فایل zip جداگانه بساز
+          # تغییر نام تکه‌ها به صورت شماره‌دار
           cd ./chunks
-          for CHUNK in chunk_*; do
-            CHUNK_NUM=$(echo "$CHUNK" | sed 's/chunk_//')
-            zip "${CHUNK_NUM}.zip" "$CHUNK"
-            echo "Created: ${CHUNK_NUM}.zip"
+          COUNTER=1
+          for FILE in chunk_*; do
+            mv "$FILE" "part_${COUNTER}.bin"
+            COUNTER=$((COUNTER+1))
           done
           
-          # ذخیره اطلاعات بازسازی
+          # ذخیره نام فایل اصلی برای بازسازی
+          BASENAME=$(basename "$MAIN_FILE")
           echo "$BASENAME" > original_name.txt
-          ls -1 *.zip > zip_files_list.txt
+          
+          # ذخیره تعداد تکه‌ها
+          echo "$((COUNTER-1))" > total_chunks.txt
+          
+          # نمایش لیست تکه‌ها با حجم هر کدام
+          echo "Created chunks:"
+          ls -lh
+          
+          ACTUAL_CHUNKS=$((COUNTER-1))
+          echo "ACTUAL_CHUNKS=$ACTUAL_CHUNKS" >> $GITHUB_ENV
       
-      - name: Upload all chunk ZIPs as a single artifact
+      - name: Generate upload steps dynamically
+        run: |
+          cd ./model/chunks
+          
+          # ساختن فایل step برای آپلود هر تکه
+          echo "TOTAL=${{ env.ACTUAL_CHUNKS }}" >> $GITHUB_ENV
+          
+          # ایجاد لیست تکه‌ها
+          ls part_*.bin > chunks_list.txt
+          
+          echo "Ready to upload ${{ env.ACTUAL_CHUNKS }} chunks"
+      
+      - name: Upload all chunks as separate artifacts
+        run: |
+          cd ./model/chunks
+          
+          TOTAL=${{ env.ACTUAL_CHUNKS }}
+          
+          for i in $(seq 1 $TOTAL); do
+            echo "Uploading part $i of $TOTAL"
+            
+            # ساخت فایل zip برای این تکه
+            zip "chunk_${i}.zip" "part_${i}.bin"
+            
+            # آپلود هر تکه به عنوان Artifact جداگانه
+            curl -L \
+              -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -H "Content-Type: application/zip" \
+              --data-binary "@chunk_${i}.zip" \
+              "https://uploads.github.com/repos/${{ github.repository }}/actions/artifacts/raw/chunk_${i}.zip?name=chunk_${i}.zip"
+            
+            # حذف فایل zip برای آزاد کردن فضا
+            rm "chunk_${i}.zip"
+          done
+          
+          # آپلود فایل اطلاعات بازسازی
+          zip "merge_info.zip" original_name.txt total_chunks.txt chunks_list.txt
+          curl -L \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@merge_info.zip" \
+            "https://uploads.github.com/repos/${{ github.repository }}/actions/artifacts/raw/merge_info.zip?name=merge_info.zip"
+      
+      - name: Upload config files
         uses: actions/upload-artifact@v4
         with:
-          name: model-10mb-chunks
-          path: ./model/chunks/*.zip
+          name: model-config-files
+          path: |
+            ./model/*.json
+            ./model/*.model
+            ./model/*.txt
+            !./model/chunks/
           retention-days: 7
