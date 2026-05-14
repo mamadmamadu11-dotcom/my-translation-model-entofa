@@ -1,79 +1,21 @@
-name: Split and Create Release
+name: Download Whisper Base Persian
 on: workflow_dispatch
 jobs:
-  split-and-release:
+  download:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Install Git LFS
         run: |
           sudo apt-get update
           sudo apt-get install git-lfs
           git lfs install
-      
-      - name: Clone and split model into 10MB chunks
-        id: split
+      - name: Clone model repository
         run: |
-          git clone https://huggingface.co/persiannlp/mt5-small-parsinlu-translation_en_fa ./model
+          git clone https://huggingface.co/arun100/whisper-base-fa-2 ./model
           cd ./model
           git lfs pull
-          
-          # پیدا کردن فایل اصلی مدل
-          MAIN_FILE=$(find . -type f -size +10M | head -1)
-          echo "Main file: $MAIN_FILE"
-          
-          # ایجاد پوشه برای تکه‌ها
-          mkdir -p chunks
-          
-          # تقسیم به تکه‌های 10MB
-          split -b 10485760 "$MAIN_FILE" chunks/chunk_
-          
-          # تغییر نام تکه‌ها و ساخت فایل zip برای هر کدام
-          cd chunks
-          COUNTER=1
-          for FILE in chunk_*; do
-            mv "$FILE" "part_${COUNTER}.bin"
-            zip "part_${COUNTER}.zip" "part_${COUNTER}.bin"
-            rm "part_${COUNTER}.bin"
-            COUNTER=$((COUNTER+1))
-          done
-          
-          TOTAL=$((COUNTER-1))
-          echo "TOTAL_CHUNKS=$TOTAL" >> $GITHUB_ENV
-          echo "total_chunks=$TOTAL" >> $GITHUB_OUTPUT
-          
-          # ذخیره اطلاعات بازسازی
-          echo "$TOTAL" > total_chunks.txt
-          echo "pytorch_model.bin" > original_name.txt
-          zip "merge_info.zip" total_chunks.txt original_name.txt
-          
-          echo "Created $TOTAL chunks of 10MB each"
-          ls -lh *.zip
-      
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+      - name: Upload model
+        uses: actions/upload-artifact@v4
         with:
-          name: "Model 10MB Chunks (${{ steps.split.outputs.total_chunks }} parts)"
-          tag_name: "v1.0.${{ github.run_number }}"
-          files: |
-            ./model/chunks/*.zip
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload config files to release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: "Model 10MB Chunks (${{ steps.split.outputs.total_chunks }} parts)"
-          tag_name: "v1.0.${{ github.run_number }}"
-          files: |
-            ./model/*.json
-            ./model/*.model
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: whisper-base-fa-model
+          path: ./model
