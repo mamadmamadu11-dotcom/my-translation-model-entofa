@@ -1,12 +1,23 @@
-name: Download Model
+name: Download Model with Git LFS
 on: workflow_dispatch
 jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - run: pip install huggingface-hub
-      - run: huggingface-cli download persiannlp/mt5-small-parsinlu-translation_en_fa --local-dir ./model
-      - uses: actions/upload-artifact@v4
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install git-lfs
+          git lfs install
+      
+      - name: Clone model repository
+        run: |
+          git clone https://huggingface.co/persiannlp/mt5-small-parsinlu-translation_en_fa ./model
+          cd ./model
+          git lfs pull
+      
+      - name: Upload model
+        uses: actions/upload-artifact@v4
         with:
-          name: model
+          name: translation-model
           path: ./model
