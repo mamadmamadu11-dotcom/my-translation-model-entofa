@@ -1,27 +1,30 @@
 name: Split and Upload Large File
 
 on:
-  workflow_dispatch:  # فقط با دستور手动 اجرا بشه
+  workflow_dispatch:
 
 jobs:
   split-and-upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download the large file (255 MB)
+      - name: Download large file with token
         run: |
-          curl -L -o original.zip "https://github.com/mamadmamadu11-dotcom/my-translation-model-entofa/actions/runs/25860151475/artifacts/6994355319"
+          curl -L -o original.zip \
+          -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+          -H "Accept: application/octet-stream" \
+          "https://api.github.com/repos/mamadmamadu11-dotcom/my-translation-model-entofa/actions/artifacts/6994355319/zip"
+          
+          echo "File downloaded. Size:"
+          ls -lh original.zip
 
       - name: Split into 10MB chunks
         run: |
           mkdir chunks
           split -b 10m original.zip chunks/part_
-          echo "✅ Split into chunks:"
+          echo "Chunks created:"
           ls -lh chunks/
 
-      - name: Upload chunks as artifacts
+      - name: Upload chunks
         uses: actions/upload-artifact@v4
         with:
           name: whisper-chunks
