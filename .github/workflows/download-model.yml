@@ -1,4 +1,4 @@
-name: Split and Create Release
+name: Split and Create Release (Stable)
 on: workflow_dispatch
 jobs:
   split-and-release:
@@ -12,7 +12,7 @@ jobs:
           sudo apt-get install git-lfs
           git lfs install
       
-      - name: Clone and split
+      - name: Clone and split model into 10MB chunks
         run: |
           git clone https://huggingface.co/persiannlp/mt5-small-parsinlu-translation_en_fa ./model
           cd ./model
@@ -29,20 +29,24 @@ jobs:
             COUNTER=$((COUNTER+1))
           done
           
-          # ساخت zip برای هر تکه
+          # ساخت فایل zip برای هر تکه (10 مگابایتی)
           for i in $(seq 1 $((COUNTER-1))); do
             zip "part_${i}.zip" "part_${i}.bin"
+            rm "part_${i}.bin"
           done
           
           echo "TOTAL=$((COUNTER-1))" >> $GITHUB_ENV
+          echo "TOTAL_CHUNKS=$((COUNTER-1))" >> $GITHUB_ENV
       
-      - name: Create Release and upload assets
-        uses: softprops/action-gh-release@v1
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2  # استفاده از نسخه جدیدتر
         with:
           name: "Model Chunks (10MB each)"
-          tag_name: "chunks_$(date +'%Y%m%d_%H%M%S')"
-          files: ./model/chunks/part_*.zip
+          tag_name: "model_chunks_${{ github.run_number }}"
           draft: false
           prerelease: false
+          files: ./model/chunks/*.zip  # آپلود همه فایل‌های zip به صورت یکجا
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
