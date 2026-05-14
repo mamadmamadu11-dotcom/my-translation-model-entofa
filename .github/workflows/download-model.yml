@@ -1,7 +1,7 @@
-name: Download Model with Git LFS
+name: Download and Split Model into 10MB Chunks
 on: workflow_dispatch
 jobs:
-  download:
+  download-and-split:
     runs-on: ubuntu-latest
     steps:
       - name: Install Git LFS
@@ -16,8 +16,52 @@ jobs:
           cd ./model
           git lfs pull
       
-      - name: Upload model
+      - name: Find and split the main model file into 10MB chunks
+        run: |
+          cd ./model
+          
+          # پیدا کردن فایل اصلی مدل (بزرگترین فایل)
+          MAIN_FILE=$(find . -type f -size +10M | head -1)
+          if [ -z "$MAIN_FILE" ]; then
+            echo "No large file found to split!"
+            exit 1
+          fi
+          
+          echo "Splitting file: $MAIN_FILE"
+          
+          # ایجاد پوشه برای تکه‌ها
+          mkdir -p ./chunks
+          
+          # نام پایه فایل تکه‌ها
+          BASENAME=$(basename "$MAIN_FILE")
+          
+          # تقسیم فایل به تکه‌های 10 مگابایتی (10 * 1024 * 1024 = 10485760 bytes)
+          split -b 10485760 "$MAIN_FILE" ./chunks/"${BASENAME}.part."
+          
+          # شمارش تعداد تکه‌ها
+          CHUNK_COUNT=$(ls -1 ./chunks/ | wc -l)
+          echo "Created $CHUNK_COUNT chunks of 10MB each"
+          
+          # ذخیره نام فایل اصلی برای بازسازی بعدی
+          echo "$MAIN_FILE" > ./chunks/original_filename.txt
+          
+          # نمایش لیست تکه‌ها
+          ls -lh ./chunks/
+      
+      - name: Upload chunks as separate artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: translation-model
-          path: ./model
+          name: model-chunks
+          path: ./model/chunks/
+          retention-days: 7
+      
+      - name: Upload non-split files (config, tokenizer, etc.)
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-other-files
+          path: |
+            ./model/*.json
+            ./model/*.model
+            ./model/*.txt
+            !./model/chunks/
+          retention-days: 7
