@@ -1,0 +1,42 @@
+name: Split and Upload Large Artifact
+
+on:
+  workflow_dispatch:  # با دکمه Run workflow اجرا می‌شه
+
+jobs:
+  split-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download original artifact
+        run: |
+          echo "Downloading artifact..."
+          curl -L -o original-file.zip \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/6994355319/zip"
+
+      - name: Split into 10MB chunks
+        run: |
+          echo "Splitting file into 10MB chunks..."
+          mkdir chunks
+          cd chunks
+          split -b 10m ../original-file.zip "chunk_"
+          ls -lh
+
+      - name: Upload chunks as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-chunks-10mb
+          path: chunks/
+          retention-days: 90
+
+      - name: Create release with chunks
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.0-chunks
+          name: "File Chunks (10MB each)"
+          files: chunks/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
