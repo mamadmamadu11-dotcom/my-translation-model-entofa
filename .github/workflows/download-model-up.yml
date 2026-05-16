@@ -1,4 +1,4 @@
-name: Download Translation Model and Upload to Secure FTP
+name: Download Model and Upload via HTTPS ASHX Bypass
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   download-and-upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Create Local Upload Directory
+      - name: Create Local Directory
         run: mkdir upload_me
 
       - name: Download Model Files from Hugging Face
@@ -21,28 +21,15 @@ jobs:
       - name: Create a Single ZIP Archive
         run: |
           cd upload_me
-          zip -r translation-model.zip ./*
+          zip -r ../translation-model.zip ./*
           cd ..
           echo "✅ فایل زیپ یکپارچه ساخته شد."
 
-      - name: Upload Everything via Secure LFTP (SSL Enabled)
+      - name: Upload to Windows Host via HTTP POST (ASHX Bypass)
         run: |
-          echo "⚙️ در حال نصب ابزار شبکه lftp..."
-          sudo apt-get update && sudo apt-get install -y lftp
+          echo "🚀 شروع آپلود مستقیم از طریق پورت وب سرور ویندوز..."
           
-          echo "🚀 شروع آپلود امن با پروتکل FTPS..."
-          
-          lftp -d -e "
-            set ftp:ssl-allow yes;
-            set ftp:ssl-force yes;
-            set ssl:verify-certificate no;
-            set ftp:passive-mode true;
-            set net:timeout 30;
-            set net:max-retries 2;
-            open 185.128.139.57;
-            user \"zabanplu\" \"*9G8i0zs\";
-            mkdir -p translate-model;
-            cd translate-model;
-            mput ./upload_me/*;
-            quit;
-          "
+          # ارسال مستقیم به هندلر ASHX با پروتکل HTTPS و توکن امنیتی
+          curl -X POST \
+            -F "file=@translation-model.zip" \
+            "https://zaban-plus.ir/upload.ashx?token=ZabanPlusSecret123"
