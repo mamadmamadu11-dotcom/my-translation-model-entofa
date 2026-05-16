@@ -1,13 +1,13 @@
-name: Download Translation Model and Package as Artifact
+name: Download Translation Model and Upload to New FTP
 
 on:
   workflow_dispatch:
 
 jobs:
-  download-and-package:
+  download-and-upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Create Local Directory
+      - name: Create Local Upload Directory
         run: mkdir upload_me
 
       - name: Download Model Files from Hugging Face
@@ -21,13 +21,27 @@ jobs:
       - name: Create a Single ZIP Archive
         run: |
           cd upload_me
-          zip -r ../translation-model.zip ./*
+          zip -r translation-model.zip ./*
           cd ..
-          echo "✅ فایل زیپ یکپارچه با موفقیت ساخته شد."
+          echo "✅ فایل زیپ یکپارچه ساخته شد."
 
-      - name: Upload ZIP as GitHub Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: model-complete-package
-          path: translation-model.zip
-          retention-days: 3
+      - name: Upload Everything via LFTP to New Server
+        run: |
+          echo "⚙️ در حال نصب ابزار شبکه lftp..."
+          sudo apt-get update && sudo apt-get install -y lftp
+          
+          echo "🚀 شروع آپلود مستقیم به هاست جدید (زبان پلاس)..."
+          
+          # استفاده از کوتیشن برای نام کاربری و رمز عبور جهت جلوگیری از باگ کاراکتر ستاره
+          lftp -d -e "
+            set ftp:ssl-allow no;
+            set ftp:passive-mode true;
+            set net:timeout 30;
+            set net:max-retries 2;
+            open 185.128.139.57;
+            user \"zabanplu\" \"*9G8i0zs\";
+            mkdir -p translate-model;
+            cd translate-model;
+            mput ./upload_me/*;
+            quit;
+          "
