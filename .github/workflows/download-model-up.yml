@@ -31,10 +31,9 @@ jobs:
       - name: Upload Everything to FTP Server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          # تغییر مهم: آدرس سرور را مستقیم بنویس تا باگ خالی بودن سکرت گیت‌هاب دور زده شود
-          server: ftp.yoursite.com
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
+          server: 3264450245.cloudydl.com
+          username: pz23744
+          password: nbfiioWy
           local-dir: ./upload_me/
           server-dir: /translate-model/
           dangerous-clean-slate: false
