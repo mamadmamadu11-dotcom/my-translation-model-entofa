@@ -3,9 +3,6 @@ name: Download Translation Model and Upload to FTP
 on:
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   download-and-upload:
     runs-on: ubuntu-latest
@@ -15,7 +12,7 @@ jobs:
 
       - name: Download Model Files from Hugging Face
         run: |
-          echo "📥 در حال دانلود فایل‌های مدل..."
+          echo "📥 در حال دانلود فایل‌های مدل از هاگینگ فیس..."
           curl -L -o upload_me/pytorch_model.bin "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/pytorch_model.bin?download=true"
           curl -L -o upload_me/source.spm "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/source.spm?download=true"
           curl -L -o upload_me/config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/config.json?download=true"
@@ -26,14 +23,21 @@ jobs:
           cd upload_me
           zip -r translation-model.zip ./*
           cd ..
-          echo "✅ فایل زیپ ساخته شد."
+          echo "✅ فایل زیپ یکپارچه ساخته شد."
 
-      - name: Upload Everything to FTP Server
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: 3264450245.cloudydl.com
-          username: pz23744
-          password: nbfiioWy
-          local-dir: ./upload_me/
-          server-dir: /translate-model/
-          dangerous-clean-slate: false
+      - name: Upload Everything via LFTP (Anti-Timeout Solution)
+        run: |
+          echo "⚙️ در حال نصب ابزار شبکه lftp..."
+          sudo apt-get update && sudo apt-get install -y lftp
+          
+          echo "🚀 شروع آپلود مستقیم و دور زدن فایروال هاست..."
+          lftp -e "
+            set ftp:ssl-allow no;
+            set ftp:passive-mode true;
+            open 3264450245.cloudydl.com;
+            user pz23744 nbfiioWy;
+            mkdir -p /translate-model;
+            cd /translate-model;
+            mput ./upload_me/*;
+            quit;
+          "
