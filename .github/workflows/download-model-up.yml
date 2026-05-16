@@ -1,42 +1,43 @@
-23.73.2.141
-104.83.5.202
-23.67.136.200
-23.67.136.202
-23.65.119.52
-96.16.122.70
-92.122.166.236
-92.122.166.234
-92.122.166.237
-104.110.138.190
-173.222.200.5
-184.51.252.36
-184.51.252.38
-104.83.5.208
-96.16.122.146
-96.17.206.214
-92.122.166.197
-104.94.100.73
-104.83.15.66
-88.221.213.81
-172.239.57.117
-104.117.76.40
-184.51.252.4
-96.17.207.30
-96.16.122.83
-96.16.122.150
-23.73.207.11
-96.16.122.77
-96.17.207.155
-92.123.189.82
-96.16.122.82
-96.16.122.66
-96.7.218.219
-96.16.122.137
-184.51.252.157
-92.123.189.41
-184.86.251.12
-96.16.122.154
-96.16.122.157
-184.51.252.152
-96.17.207.12
-23.79.48.162
+name: Download Model and Upload via ASHX Chunked Bypass
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Local Directory
+        run: mkdir upload_me
+
+      - name: Download Model Files from Hugging Face
+        run: |
+          echo "📥 در حال دانلود فایل‌های مدل از هاگینگ فیس..."
+          curl -L -o upload_me/pytorch_model.bin "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/pytorch_model.bin?download=true"
+          curl -L -o upload_me/source.spm "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/source.spm?download=true"
+          curl -L -o upload_me/config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/config.json?download=true"
+          curl -L -o upload_me/generation_config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/generation_config.json?download=true"
+
+      - name: Compress and Split into 25MB Chunks
+        run: |
+          cd upload_me
+          # خرد کردن فایل زیپ به تکه‌های ۲۵ مگابایتی برای دور زدن محدودیت لایه وب هاست
+          zip -r -s 25m ../translation-model.zip ./*
+          cd ..
+          echo "✅ فایل غول‌آسا به تکه‌های کوچک ۲۵ مگابایتی خرد شد:"
+          ls -lh translation-model.*
+
+      - name: Upload Chunks to Windows Host via HTTP POST
+        run: |
+          echo "🚀 شروع آپلود تکه‌تکه فایل‌ها به سرور ویندوز..."
+          
+          # اجرای حلقه برای آپلود تک‌تک بخش‌های تقسیم‌شده
+          for file in translation-model.z* translation-model.zip; do
+            if [ -f "$file" ]; then
+              echo "📤 در حال ارسال تکه: $file ..."
+              curl -X POST \
+                -F "file=@$file" \
+                "https://zaban-plus.ir/upload.ashx?token=ZabanPlusSecret123"
+              echo -e "\n-----------------------------------"
+            fi
+          done
