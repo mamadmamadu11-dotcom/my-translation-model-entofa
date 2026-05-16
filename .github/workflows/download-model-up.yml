@@ -3,7 +3,6 @@ name: Download Translation Model and Upload to FTP
 on:
   workflow_dispatch:
 
-# حل ریشه‌ای اخطار گیت‌هاب و اجبار به استفاده از Node 24
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -27,12 +26,13 @@ jobs:
           cd upload_me
           zip -r translation-model.zip ./*
           cd ..
-          echo "✅ فایل زیپ یکپارچه ساخته شد."
+          echo "✅ فایل زیپ ساخته شد."
 
       - name: Upload Everything to FTP Server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          # تغییر مهم: آدرس سرور را مستقیم بنویس تا باگ خالی بودن سکرت گیت‌هاب دور زده شود
+          server: ftp.yoursite.com
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./upload_me/
