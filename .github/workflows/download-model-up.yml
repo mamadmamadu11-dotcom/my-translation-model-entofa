@@ -1,4 +1,4 @@
-name: Download Whisper Base Persian and Upload to FTP
+name: Download Translation Model and Upload to FTP
 
 on:
   workflow_dispatch:
@@ -7,42 +7,40 @@ jobs:
   download-and-upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Git LFS
-        run: |
-          sudo apt-get update
-          sudo apt-get install git-lfs
-          git lfs install
+      - name: Create Local Upload Directory
+        run: mkdir upload_me
 
-      - name: Clone model repository from Hugging Face
+      - name: Download Model Files from Hugging Face
         run: |
-          git clone https://huggingface.co/arun100/whisper-base-fa-2 ./model
-          cd ./model
-          git lfs pull
+          echo "📥 در حال دانلود فایل‌های مدل..."
+          
+          # دانلود فایل اصلی وزن‌های مدل (حدود ۳۰۰ مگابایت)
+          curl -L -o upload_me/pytorch_model.bin "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/pytorch_model.bin?download=true"
+          
+          # دانلود فایل توکن‌ساز مبدا
+          curl -L -o upload_me/source.spm "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/source.spm?download=true"
+          
+          # دانلود فایل کانفیگ اصلی
+          curl -L -o upload_me/config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/config.json?download=true"
+          
+          # دانلود فایل کانفیگ ساختار جملات
+          curl -L -o upload_me/generation_config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/generation_config.json?download=true"
 
-      - name: Compress model folder (split into 10MB chunks)
+      - name: Create a Single ZIP Archive
         run: |
-          # فشرده‌سازی کل پوشه مدل
-          zip -r -s 10m whisper-model.zip ./model/
-          echo "✅ Compression done. Files created:"
-          ls -lh whisper-model.z*
+          # ورود به پوشه، زیپ کردن همه فایل‌ها در قالب یک فایل واحد و خروج
+          cd upload_me
+          zip -r translation-model.zip ./*
+          cd ..
+          echo "✅ فایل زیپ یکپارچه ساخته شد. لیست فایل‌های آماده آپلود:"
+          ls -lh upload_me
 
-      - name: Upload to FTP server
+      - name: Upload Everything to FTP Server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./
-          server-dir: /whisper-model/
-          dangerous-clean-slate: true
-          exclude: |
-            ./model/
-            .git/
-            .gitattributes
-
-      - name: Also upload as GitHub Artifact (backup)
-        uses: actions/upload-artifact@v4
-        with:
-          name: whisper-base-fa-model-chunks
-          path: whisper-model.z*
-          retention-days: 7
+          local-dir: ./upload_me/
+          server-dir: /translate-model/
+          dangerous-clean-slate: false # جهت امنیت هاست شما روی false قرار گرفت تا بقیه پوشه‌های هاست پاک نشوند
