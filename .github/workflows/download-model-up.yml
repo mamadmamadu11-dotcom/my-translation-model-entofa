@@ -3,6 +3,10 @@ name: Download Translation Model and Upload to FTP
 on:
   workflow_dispatch:
 
+# حل ریشه‌ای اخطار گیت‌هاب و اجبار به استفاده از Node 24
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   download-and-upload:
     runs-on: ubuntu-latest
@@ -13,27 +17,17 @@ jobs:
       - name: Download Model Files from Hugging Face
         run: |
           echo "📥 در حال دانلود فایل‌های مدل..."
-          
-          # دانلود فایل اصلی وزن‌های مدل (حدود ۳۰۰ مگابایت)
           curl -L -o upload_me/pytorch_model.bin "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/pytorch_model.bin?download=true"
-          
-          # دانلود فایل توکن‌ساز مبدا
           curl -L -o upload_me/source.spm "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/source.spm?download=true"
-          
-          # دانلود فایل کانفیگ اصلی
           curl -L -o upload_me/config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/config.json?download=true"
-          
-          # دانلود فایل کانفیگ ساختار جملات
           curl -L -o upload_me/generation_config.json "https://huggingface.co/Helsinki-NLP/opus-mt-en-af/resolve/main/generation_config.json?download=true"
 
       - name: Create a Single ZIP Archive
         run: |
-          # ورود به پوشه، زیپ کردن همه فایل‌ها در قالب یک فایل واحد و خروج
           cd upload_me
           zip -r translation-model.zip ./*
           cd ..
-          echo "✅ فایل زیپ یکپارچه ساخته شد. لیست فایل‌های آماده آپلود:"
-          ls -lh upload_me
+          echo "✅ فایل زیپ یکپارچه ساخته شد."
 
       - name: Upload Everything to FTP Server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -43,4 +37,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./upload_me/
           server-dir: /translate-model/
-          dangerous-clean-slate: false # جهت امنیت هاست شما روی false قرار گرفت تا بقیه پوشه‌های هاست پاک نشوند
+          dangerous-clean-slate: false
