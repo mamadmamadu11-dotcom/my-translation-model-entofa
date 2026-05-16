@@ -1,4 +1,4 @@
-name: Download Translation Model and Upload to New FTP
+name: Download Translation Model and Upload to Secure FTP
 
 on:
   workflow_dispatch:
@@ -25,16 +25,17 @@ jobs:
           cd ..
           echo "✅ فایل زیپ یکپارچه ساخته شد."
 
-      - name: Upload Everything via LFTP to New Server
+      - name: Upload Everything via Secure LFTP (SSL Enabled)
         run: |
           echo "⚙️ در حال نصب ابزار شبکه lftp..."
           sudo apt-get update && sudo apt-get install -y lftp
           
-          echo "🚀 شروع آپلود مستقیم به هاست جدید (زبان پلاس)..."
+          echo "🚀 شروع آپلود امن با پروتکل FTPS..."
           
-          # استفاده از کوتیشن برای نام کاربری و رمز عبور جهت جلوگیری از باگ کاراکتر ستاره
           lftp -d -e "
-            set ftp:ssl-allow no;
+            set ftp:ssl-allow yes;
+            set ftp:ssl-force yes;
+            set ssl:verify-certificate no;
             set ftp:passive-mode true;
             set net:timeout 30;
             set net:max-retries 2;
