@@ -25,17 +25,21 @@ jobs:
           cd ..
           echo "✅ فایل زیپ یکپارچه ساخته شد."
 
-      - name: Upload Everything via LFTP (Anti-Timeout Solution)
+      - name: Upload Everything via LFTP (With Debug and Timeout)
         run: |
           echo "⚙️ در حال نصب ابزار شبکه lftp..."
           sudo apt-get update && sudo apt-get install -y lftp
           
-          echo "🚀 شروع آپلود مستقیم و دور زدن فایروال هاست..."
-          lftp -e "
+          echo "🚀 شروع آپلود مستقیم با سیستم نظارت بر خطا..."
+          
+          # افزودن پرچم -d برای دباگ زنده و تنظیم تایم‌اوت ۱۵ ثانیه‌ای جهت جلوگیری از معطلی ۱۲ دقیقه‌ای
+          lftp -d -e "
             set ftp:ssl-allow no;
             set ftp:passive-mode true;
+            set net:timeout 15;
+            set net:max-retries 1;
             open 3264450245.cloudydl.com;
-            user pz23744 nbfiioWy;
+            user pz23744 gAFBd@wV39!au;
             mkdir -p /translate-model;
             cd /translate-model;
             mput ./upload_me/*;
